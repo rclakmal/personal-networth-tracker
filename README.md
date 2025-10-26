@@ -1,4 +1,4 @@
-# networth_tracker — quick start
+# Personal Networth Tracker
 
 A small Flask app to track accounts and visualize net worth over time. 
 
