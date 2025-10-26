@@ -101,6 +101,27 @@ class DatabaseInterface:
                 FOREIGN KEY (user_id) REFERENCES users (id)
             )
             ''')
+
+            # Tags table (for account tagging) and junction table account_tags
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS tags (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL
+            )
+            ''')
+
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS account_tags (
+                account_id INTEGER NOT NULL,
+                tag_id INTEGER NOT NULL,
+                PRIMARY KEY (account_id, tag_id),
+                FOREIGN KEY (account_id) REFERENCES accounts (id) ON DELETE CASCADE,
+                FOREIGN KEY (tag_id) REFERENCES tags (id) ON DELETE CASCADE
+            )
+            ''')
+
+            # Optional index to speed up tag lookups
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name)')
             
             conn.commit()
     
