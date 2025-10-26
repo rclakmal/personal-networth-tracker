@@ -27,3 +27,10 @@ Optional: to isolate project dependencies, you may create and activate a virtual
 - Historical account values and daily net worth charts 
 - Multi-currency support (fiat + crypto) with live rates and fallback data
 - Multiple themes (including a dark theme)
+
+## Screenshots from the applications
+
+<img width="1342" height="624" alt="image" src="https://github.com/user-attachments/assets/a30b04a8-d230-4f09-a0ba-dbd7fbb2112f" />
+<img width="1342" height="624" alt="image" src="https://github.com/user-attachments/assets/8d8513a0-2048-4468-8739-42a41ff38a94" />
+
+
