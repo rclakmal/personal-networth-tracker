@@ -1,0 +1,203 @@
+<!-- Add Asset Modal -->
+<div class="modal fade" id="addAssetModal" tabindex="-1" aria-labelledby="addAssetModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addAssetModalLabel">Add New Asset</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="add-asset-form">
+                    <!-- Name -->
+                    <div class="mb-3">
+                        <label for="asset-name" class="form-label">Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="asset-name" name="name" required placeholder="e.g., Savings Account">
+                    </div>
+
+                    <!-- Value -->
+                    <div class="mb-3">
+                        <label for="asset-value" class="form-label">Value <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <button class="btn btn-outline-secondary" type="button" id="value-sign-toggle">+</button>
+                            <input type="number" class="form-control" id="asset-value" name="current_value" required step="0.01" min="0" placeholder="0.00">
+                        </div>
+                        <small class="form-text text-muted">Toggle +/- to switch between asset and liability</small>
+                    </div>
+
+                    <!-- Currency -->
+                    <div class="mb-3">
+                        <label for="asset-currency" class="form-label">Currency <span class="text-danger">*</span></label>
+                        <select class="form-select" id="asset-currency" name="currency" required>
+                            <option value="">Select currency...</option>
+                        </select>
+                    </div>
+
+                    <!-- Tags (Multiple) -->
+                    <div class="mb-3">
+                        <label for="asset-tag-input" class="form-label">Tags</label>
+                        <div class="tag-input-container">
+                            <div class="tag-input-wrapper" id="tag-input-wrapper">
+                                <div id="selected-tags" class="selected-tags-inline">
+                                    <!-- Tags will be displayed here as badges inline -->
+                                </div>
+                                <input type="text" 
+                                       class="tag-input-field" 
+                                       id="asset-tag-input" 
+                                       placeholder="Type to add tags..." 
+                                       autocomplete="off">
+                            </div>
+                            <div id="tag-suggestions-dropdown" class="tag-suggestions-dropdown" style="display: none;">
+                                <!-- Suggestions will appear here -->
+                            </div>
+                        </div>
+                        <small class="form-text text-muted">Type and press Enter or comma to add tags. Click × to remove.</small>
+                        <!-- Hidden input to store tags as JSON array -->
+                        <input type="hidden" id="asset-tags-hidden" name="tags" value="[]">
+                    </div>
+
+                    <!-- Liquidity -->
+                    <div class="mb-3">
+                        <label for="asset-liquidity" class="form-label">Liquidity</label>
+                        <select class="form-select" id="asset-liquidity" name="term_length">
+                            <option value="0.8">Very High (Cash, Savings)</option>
+                            <option value="0.6" selected>High (Stocks, Bonds)</option>
+                            <option value="0.4">Medium (Real Estate)</option>
+                            <option value="0.2">Low (Collectibles)</option>
+                            <option value="0.0">Very Low (Retirement Funds)</option>
+                        </select>
+                        <small class="form-text text-muted">How quickly can you convert this to cash?</small>
+                    </div>
+
+                    <!-- Ownership -->
+                    <div class="mb-3">
+                        <label for="asset-ownership" class="form-label">Ownership %</label>
+                        <input type="number" class="form-control" id="asset-ownership" name="ownership_ratio" min="0" max="100" step="5" value="100" placeholder="100">
+                        <small class="form-text text-muted">What percentage do you own? (0-100)</small>
+                    </div>
+
+                    <!-- Error Display -->
+                    <div id="add-asset-error" class="alert alert-danger" style="display: none;"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="submit-asset-btn">Add Asset</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteConfirmModalLabel">Confirm Delete</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">Are you sure you want to permanently DELETE <strong id="delete-account-name"></strong>?</p>
+                <div class="alert alert-warning mb-0">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>Warning:</strong> This action cannot be undone and will remove all history data for this account.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-delete-btn">Delete Permanently</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Archive Confirmation Modal -->
+<div class="modal fade" id="archiveConfirmModal" tabindex="-1" aria-labelledby="archiveConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title" id="archiveConfirmModalLabel">Confirm Archive</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">Are you sure you want to ARCHIVE <strong id="archive-account-name"></strong>?</p>
+                <div class="alert alert-info mb-0">
+                    <p class="mb-1">This will:</p>
+                    <ul class="mb-0">
+                        <li>Set the current value to 0</li>
+                        <li>Mark the account as archived</li>
+                        <li>Hide it from active accounts list</li>
+                    </ul>
+                    <p class="mt-2 mb-0"><small>You can view archived accounts by enabling "Show Archived" checkbox.</small></p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" id="confirm-archive-btn">Archive Account</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Tags Modal -->
+<div class="modal fade" id="editTagsModal" tabindex="-1" aria-labelledby="editTagsModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editTagsModalLabel">Edit Tags</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="edit-tag-input" class="form-label">Tags</label>
+                    <div class="tag-input-container">
+                        <div class="tag-input-wrapper" id="edit-tag-input-wrapper">
+                            <div id="edit-selected-tags" class="selected-tags-inline">
+                                <!-- Tags will be displayed here as badges inline -->
+                            </div>
+                            <input type="text" 
+                                   class="tag-input-field" 
+                                   id="edit-tag-input" 
+                                   placeholder="Type to add tags..." 
+                                   autocomplete="off">
+                        </div>
+                        <div id="edit-tag-suggestions-dropdown" class="tag-suggestions-dropdown" style="display: none;">
+                            <!-- Suggestions will appear here -->
+                        </div>
+                    </div>
+                    <small class="form-text text-muted">Type and press Enter or comma to add tags. Click × to remove.</small>
+                    <!-- Hidden input to store tags as JSON array -->
+                    <input type="hidden" id="edit-tags-hidden" value="[]">
+                    <input type="hidden" id="edit-tags-account-id" value="">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="save-tags-btn">Save Tags</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Note Modal -->
+<div class="modal fade" id="editNoteModal" tabindex="-1" aria-labelledby="editNoteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editNoteModalLabel">Account Note</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="edit-note-textarea" class="form-label">Note</label>
+                    <textarea class="form-control" id="edit-note-textarea" rows="6" placeholder="Enter notes about this account..."></textarea>
+                    <small class="form-text text-muted">Add any relevant information or reminders about this account.</small>
+                    <input type="hidden" id="edit-note-account-id" value="">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="save-note-btn">Save Note</button>
+            </div>
+        </div>
+    </div>
+</div>

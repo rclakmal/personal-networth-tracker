@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Profile - Net Worth Tracker{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4>User Profile</h4>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Username:</strong></label>
+                        <p class="form-control-plaintext">{{ user.username }}</p>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Email:</strong></label>
+                        <p class="form-control-plaintext">{{ user.email }}</p>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Default Currency:</strong></label>
+                        <p class="form-control-plaintext">{{ user.default_currency }}</p>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <a href="{{ url_for('user.change_password') }}" class="btn btn-primary">Change Password</a>
+                        <a href="{{ url_for('networth.home') }}" class="btn btn-secondary">Back to Dashboard</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

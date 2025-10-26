@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}Net Worth Tracker{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 pt-4">
+    <!-- Summary Cards -->
+    <div class="row text-center mb-4">
+        <div class="col-md-3">
+            <div class="metric-card">
+                <h3 id="current-networth" class="metric-value net-worth">€0</h3>
+                <p class="metric-label">Net Worth</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card">
+                <h3 id="total-assets" class="metric-value text-success">€0</h3>
+                <p class="metric-label">Assets</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card">
+                <h3 id="total-liabilities" class="metric-value text-danger">€0</h3>
+                <p class="metric-label">Liabilities</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card">
+                <h3 id="growth-percentage" class="metric-value">0%</h3>
+                <p class="metric-label">Growth</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart Section (Full Width) -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="chart-container">
+                <!-- Time Period Selector -->
+                <div class="time-selector mb-3 d-flex justify-content-between align-items-center">
+                    <h5 class="chart-title mb-0">Net Worth History</h5>
+                    <div class="time-period-dropdown">
+                        <select id="time-period-select" class="form-select form-select-sm">
+                            <option value="week">1 Week</option>
+                            <option value="month">1 Month</option>
+                            <option value="3months">3 Months</option>
+                            <option value="6months">6 Months</option>
+                            <option value="ytd" selected>Year to Date</option>
+                            <option value="year">1 Year</option>
+                            <option value="2years">2 Years</option>
+                            <option value="3years">3 Years</option>
+                            <option value="4years">4 Years</option>
+                            <option value="5years">5 Years</option>
+                            <option value="max">Max</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Chart Canvas Container -->
+                <div class="chart-content">
+                    <canvas id="networthChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Split Layout: Asset List (Left) and Asset Details (Right) -->
+    <div class="row">
+        <!-- Left Side: Asset List -->
+        <div class="col-md-4">
+            <div class="asset-list-panel">
+                <!-- Header with All Controls -->
+                <div class="asset-list-header">
+                    <div class="btn-group toggle-buttons" role="group">
+                        <button type="button" class="btn btn-outline-primary active" id="assets-toggle">
+                            Assets
+                        </button>
+                        <button type="button" class="btn btn-outline-primary" id="liabilities-toggle">
+                            Liabilities
+                        </button>
+                        <button type="button" class="btn btn-outline-primary" id="add-asset-btn" data-bs-toggle="modal" data-bs-target="#addAssetModal">
+                            <i class="bi bi-plus-lg"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- Sort Controls -->
+                    <div class="sort-controls-inline">
+                        <label class="sort-label">Sort by:</label>
+                        <select id="sort-select" class="form-select form-select-sm">
+                            <option value="value-desc" selected>Value (High to Low)</option>
+                            <option value="value-asc">Value (Low to High)</option>
+                            <option value="name-asc">Name (A to Z)</option>
+                            <option value="name-desc">Name (Z to A)</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Show Archived Checkbox -->
+                    <div class="archived-controls-inline">
+                        <label class="sort-label">Show Archived:</label>
+                        <input class="form-check-input" type="checkbox" id="show-archived-check">
+                    </div>
+                </div>
+
+                <!-- Asset List -->
+                <div id="asset-list" class="asset-list">
+                    <!-- Assets will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Side: Asset Details -->
+        <div class="col-md-8">
+            <div id="asset-details-panel" class="asset-details-panel">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="detail-title mb-0" id="detail-title">Asset Details</h5>
+                    <div class="asset-period-dropdown" style="display: none;">
+                        <select id="asset-period-select" class="form-select form-select-sm">
+                            <option value="week">1 Week</option>
+                            <option value="month">1 Month</option>
+                            <option value="3months">3 Months</option>
+                            <option value="6months">6 Months</option>
+                            <option value="ytd" selected>Year to Date</option>
+                            <option value="year">1 Year</option>
+                            <option value="2years">2 Years</option>
+                            <option value="3years">3 Years</option>
+                            <option value="4years">4 Years</option>
+                            <option value="5years">5 Years</option>
+                            <option value="max">Max</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="asset-details-content">
+                    <p class="text-muted text-center">Select an asset from the list to view details</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Include Modal Components -->
+{% include 'modals.html' %}
+
+<!-- Load JavaScript Modules -->
+<script src="{{ url_for('static', filename='js/state.js') }}"></script>
+<script src="{{ url_for('static', filename='js/utils.js') }}"></script>
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script src="{{ url_for('static', filename='js/accounts.js') }}"></script>
+<script src="{{ url_for('static', filename='js/account-details.js') }}"></script>
+<script src="{{ url_for('static', filename='js/tags.js') }}"></script>
+<script src="{{ url_for('static', filename='js/modals.js') }}"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+
+{% endblock %}
