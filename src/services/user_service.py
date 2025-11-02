@@ -1,7 +1,9 @@
 """
 User service for business logic operations.
+Service layer contains all business logic, orchestration, and calls to repository layer.
 """
 from typing import Optional, List, Dict, Any
+from datetime import datetime, timedelta
 from src.models.user import User
 from src.repositories.user_repository import UserRepository
 from src.utils.database import DatabaseInterface
@@ -10,13 +12,85 @@ from src.utils.database import DatabaseInterface
 class UserService:
     """Service class for User business logic."""
     
-    def __init__(self, user_repository: UserRepository):
-        """Initialize service with repository."""
+    def __init__(self, user_repository: UserRepository, db: DatabaseInterface):
+        """Initialize service with repository and database."""
         self.user_repository = user_repository
+        self.db = db
     
     def authenticate_user(self, username: str, password: str, ip_address: str = None, user_agent: str = None) -> Optional[User]:
         """Authenticate user credentials with security enhancements."""
-        return self.user_repository.authenticate(username, password, ip_address, user_agent)
+        user = self.user_repository.find_by_username(username)
+        
+        if not user:
+            # Log failed authentication attempt for non-existent user
+            self.db.log_security_event(
+                user_id=None,
+                event_type='LOGIN_FAILED_USER_NOT_FOUND',
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details=f'Login attempt for non-existent username: {username}'
+            )
+            return None
+        
+        # Check if account is locked
+        if user.is_account_locked():
+            self.db.log_security_event(
+                user_id=user.id,
+                event_type='LOGIN_BLOCKED_ACCOUNT_LOCKED',
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details='Login attempt on locked account'
+            )
+            return None
+        
+        # Check if account is active
+        if not user.is_active:
+            self.db.log_security_event(
+                user_id=user.id,
+                event_type='LOGIN_BLOCKED_ACCOUNT_INACTIVE',
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details='Login attempt on inactive account'
+            )
+            return None
+        
+        # Verify password
+        if self.db.verify_password(password, user.password_hash):
+            # Successful login - reset failed attempts and update last login
+            user.failed_login_attempts = 0
+            user.account_locked_until = None
+            user.last_login = datetime.now()
+            self.user_repository.update(user)
+            
+            self.db.log_security_event(
+                user_id=user.id,
+                event_type='LOGIN_SUCCESS',
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details='Successful login'
+            )
+            return user
+        else:
+            # Failed password - increment failed attempts
+            user.failed_login_attempts += 1
+            
+            # Lock account after 5 failed attempts for 30 minutes
+            if user.failed_login_attempts >= 5:
+                user.account_locked_until = datetime.now() + timedelta(minutes=30)
+                lock_details = f'Account locked after {user.failed_login_attempts} failed attempts'
+            else:
+                lock_details = f'Failed login attempt #{user.failed_login_attempts}'
+            
+            self.user_repository.update(user)
+            
+            self.db.log_security_event(
+                user_id=user.id,
+                event_type='LOGIN_FAILED_WRONG_PASSWORD',
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details=lock_details
+            )
+            return None
     
     def get_user_by_id(self, user_id: int) -> Optional[User]:
         """Get user by ID."""
@@ -44,7 +118,7 @@ class UserService:
         user = User(
             username=username,
             email=email,
-            password_hash=DatabaseInterface.hash_password(password)
+            password_hash=self.db.hash_password(password)
         )
         
         try:
@@ -65,11 +139,13 @@ class UserService:
         """Create sample accounts for new user."""
         from datetime import datetime, timedelta
         from src.repositories.account_repository import AccountRepository
+        from src.repositories.account_history_repository import AccountHistoryRepository
         from src.models.account import Account
         from src.models.account_history import AccountHistory
         
-        # Get account repository
-        account_repo = AccountRepository(self.user_repository.db)
+        # Get repositories
+        account_repo = AccountRepository(self.db)
+        history_repo = AccountHistoryRepository(self.db)
         
         # Sample assets (account_type is now computed based on current_value)
         sample_assets = [
@@ -156,7 +232,7 @@ class UserService:
                     value=historical_value,
                     currency=account_data['currency']
                 )
-                account_repo.add_history(history_entry)
+                history_repo.create(history_entry)
     
     def update_user(self, user_id: int, **kwargs) -> Dict[str, Any]:
         """Update user information."""
@@ -170,7 +246,7 @@ class UserService:
         if 'email' in kwargs:
             user.email = kwargs['email']
         if 'password' in kwargs:
-            user.password_hash = DatabaseInterface.hash_password(kwargs['password'])
+            user.password_hash = self.db.hash_password(kwargs['password'])
         if 'preferred_currency' in kwargs:
             # Validate currency code
             from src.utils.validation import InputValidator
@@ -205,10 +281,9 @@ class UserService:
             return {'success': False, 'error': 'User not found'}
         
         # Verify current password
-        db = DatabaseInterface()
-        if not db.verify_password(current_password, user.password_hash):
+        if not self.db.verify_password(current_password, user.password_hash):
             # Log failed password change attempt
-            db.log_security_event(
+            self.db.log_security_event(
                 user_id=user_id,
                 event_type='PASSWORD_CHANGE_FAILED',
                 ip_address=ip_address,
@@ -218,7 +293,7 @@ class UserService:
             return {'success': False, 'error': 'Current password is incorrect'}
         
         # Hash new password
-        new_password_hash = db.hash_password(new_password)
+        new_password_hash = self.db.hash_password(new_password)
         
         # Update password
         user.password_hash = new_password_hash
@@ -227,7 +302,7 @@ class UserService:
             success = self.user_repository.update(user)
             if success:
                 # Log successful password change
-                db.log_security_event(
+                self.db.log_security_event(
                     user_id=user_id,
                     event_type='PASSWORD_CHANGED',
                     ip_address=ip_address,

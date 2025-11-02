@@ -4,14 +4,18 @@ Account controller for handling account-related API endpoints.
 from flask import request, jsonify, session
 from src.services.account_service import AccountService
 from src.utils.validation import InputValidator
+from src.repositories.exchange_rate_repository import ExchangeRateRepository
+from src.services.exchange_rate_service import ExchangeRateService
 
 
 class AccountController:
     """Controller for account-related operations."""
     
-    def __init__(self, account_service: AccountService):
+    def __init__(self, account_service: AccountService, db=None):
         """Initialize controller with account service."""
         self.account_service = account_service
+        self.exchange_rate_repo = ExchangeRateRepository(db) if db else None
+        self.exchange_rate_service = ExchangeRateService(db, self.exchange_rate_repo) if db else None
     
     def _get_current_user_id(self):
         """Get current user ID from session."""
@@ -37,9 +41,10 @@ class AccountController:
         sort_by = request.args.get('sort', 'value-desc')
         include_archived = request.args.get('include_archived', 'false').lower() == 'true'
         
-        # Get exchange rates
-        from decimal import Decimal
-        exchange_rates = self._get_exchange_rates(currency)
+        # Get USD-based exchange rates once (cached if < 24hrs)
+        usd_rates = self.exchange_rate_service.get_usd_rates() if self.exchange_rate_service else None
+        if not usd_rates:
+            return jsonify({'error': 'Exchange rates unavailable'}), 503
         
         # Get accounts
         accounts = self.account_service.get_user_accounts(user_id, include_archived=include_archived)
@@ -56,8 +61,16 @@ class AccountController:
             original_value = account['current_value']
             original_currency = account['currency']
             
-            # Convert value to target currency
-            converted_value = self._convert_currency(original_value, original_currency, currency, exchange_rates)
+            # Convert value to target currency using cached USD rates
+            converted_value = self.exchange_rate_service.convert_with_cached_rates(
+                original_value, original_currency, currency, usd_rates
+            )
+            
+            # If conversion fails (currency not found), return error
+            if converted_value is None:
+                return jsonify({
+                    'error': f'Currency {original_currency} or {currency} not available in exchange rates'
+                }), 400
             
             # Create asset object for frontend
             asset_obj = {
@@ -115,92 +128,6 @@ class AccountController:
             'total_liabilities': total_liabilities,
             'sort': sort_by
         })
-    
-    def _get_exchange_rates(self, base_currency='EUR'):
-        """Get exchange rates with fallback."""
-        try:
-            # Try to fetch from API first
-            import requests
-            
-            # Use USD as the API base (most APIs use USD)
-            response = requests.get('https://open.er-api.com/v6/latest/USD', timeout=5)
-            
-            if response.status_code == 200:
-                data = response.json()
-                api_rates = data.get('rates', {})
-                
-                if api_rates:
-                    # Add crypto rates (API doesn't include crypto)
-                    try:
-                        crypto_response = requests.get(
-                            'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,tether,binancecoin,cardano,solana,ripple&vs_currencies=usd',
-                            timeout=3
-                        )
-                        if crypto_response.status_code == 200:
-                            crypto_data = crypto_response.json()
-                            # Convert crypto prices to rates (1 USD = X crypto)
-                            if 'bitcoin' in crypto_data:
-                                api_rates['BTC'] = 1.0 / crypto_data['bitcoin']['usd']
-                            if 'ethereum' in crypto_data:
-                                api_rates['ETH'] = 1.0 / crypto_data['ethereum']['usd']
-                            if 'tether' in crypto_data:
-                                api_rates['USDT'] = 1.0 / crypto_data['tether']['usd']
-                            if 'binancecoin' in crypto_data:
-                                api_rates['BNB'] = 1.0 / crypto_data['binancecoin']['usd']
-                            if 'cardano' in crypto_data:
-                                api_rates['ADA'] = 1.0 / crypto_data['cardano']['usd']
-                            if 'solana' in crypto_data:
-                                api_rates['SOL'] = 1.0 / crypto_data['solana']['usd']
-                            if 'ripple' in crypto_data:
-                                api_rates['XRP'] = 1.0 / crypto_data['ripple']['usd']
-                    except:
-                        pass  # Continue without crypto rates
-                    
-                    # API returns rates with USD as base
-                    # Convert to requested base currency
-                    if base_currency == 'USD':
-                        return api_rates
-                    elif base_currency in api_rates:
-                        # Convert from USD base to requested base
-                        base_rate = api_rates[base_currency]
-                        converted_rates = {}
-                        for currency, rate in api_rates.items():
-                            converted_rates[currency] = rate / base_rate
-                        return converted_rates
-                    else:
-                        # Base currency not found, use USD rates
-                        return api_rates
-        except Exception:
-            pass  # Silent fallback to hardcoded rates
-        
-        # Fallback to configuration file rates
-        from src.config.fallback_data import FALLBACK_EXCHANGE_RATES
-        fallback_rates = FALLBACK_EXCHANGE_RATES.copy()
-        
-        # If base is not EUR, convert rates
-        if base_currency != 'EUR' and base_currency in fallback_rates:
-            base_rate = fallback_rates[base_currency]
-            converted_rates = {}
-            for currency, rate in fallback_rates.items():
-                converted_rates[currency] = rate / base_rate
-            return converted_rates
-        
-        return fallback_rates
-    
-    def _convert_currency(self, amount, from_currency, to_currency, exchange_rates):
-        """Convert amount from one currency to another."""
-        if from_currency == to_currency.upper():
-            return float(amount)
-        
-        # Convert: amount -> EUR -> target currency
-        from_rate = exchange_rates.get(from_currency, 1.0)
-        value_in_eur = float(amount) / from_rate if from_rate != 0 else float(amount)
-        
-        if to_currency.upper() == 'EUR':
-            return value_in_eur
-        else:
-            to_rate = exchange_rates.get(to_currency.upper(), 1.0)
-            return value_in_eur * to_rate
     
     def get_accounts_by_currency(self, currency):
         """Get accounts filtered by currency."""

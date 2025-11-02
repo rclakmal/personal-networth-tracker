@@ -123,6 +123,20 @@ class DatabaseInterface:
             # Optional index to speed up tag lookups
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name)')
             
+            # Exchange rates table - USD-based only (simplified)
+            # All rates are stored with USD as base currency
+            # To convert X to Y: amount_usd = amount_x / rate_x, amount_y = amount_usd * rate_y
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS exchange_rates_usd (
+                target_currency TEXT PRIMARY KEY,
+                rate REAL NOT NULL,
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            ''')
+            
+            # Index for checking last update time
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_exchange_rates_usd_updated ON exchange_rates_usd(last_updated)')
+            
             conn.commit()
     
     def execute_query(self, query: str, params: tuple = ()) -> List[Dict[str, Any]]:

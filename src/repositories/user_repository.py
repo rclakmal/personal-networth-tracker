@@ -1,5 +1,6 @@
 """
 User repository for database operations.
+Repository layer should only contain SQL queries, no business logic.
 """
 from typing import Optional, List
 from src.models.user import User
@@ -100,83 +101,6 @@ class UserRepository:
         query = "DELETE FROM users WHERE id = ?"
         rows_affected = self.db.execute_update(query, (user_id,))
         return rows_affected > 0
-    
-    def authenticate(self, username: str, password: str, ip_address: str = None, user_agent: str = None) -> Optional[User]:
-        """Authenticate user by username and password with security enhancements."""
-        from datetime import datetime, timedelta
-        
-        user = self.find_by_username(username)
-        
-        if not user:
-            # Log failed authentication attempt for non-existent user
-            self.db.log_security_event(
-                user_id=None,
-                event_type='LOGIN_FAILED_USER_NOT_FOUND',
-                ip_address=ip_address,
-                user_agent=user_agent,
-                details=f'Login attempt for non-existent username: {username}'
-            )
-            return None
-        
-        # Check if account is locked
-        if user.is_account_locked():
-            self.db.log_security_event(
-                user_id=user.id,
-                event_type='LOGIN_BLOCKED_ACCOUNT_LOCKED',
-                ip_address=ip_address,
-                user_agent=user_agent,
-                details='Login attempt on locked account'
-            )
-            return None
-        
-        # Check if account is active
-        if not user.is_active:
-            self.db.log_security_event(
-                user_id=user.id,
-                event_type='LOGIN_BLOCKED_ACCOUNT_INACTIVE',
-                ip_address=ip_address,
-                user_agent=user_agent,
-                details='Login attempt on inactive account'
-            )
-            return None
-        
-        # Verify password
-        if self.db.verify_password(password, user.password_hash):
-            # Successful login - reset failed attempts and update last login
-            user.failed_login_attempts = 0
-            user.account_locked_until = None
-            user.last_login = datetime.now()
-            self.update(user)
-            
-            self.db.log_security_event(
-                user_id=user.id,
-                event_type='LOGIN_SUCCESS',
-                ip_address=ip_address,
-                user_agent=user_agent,
-                details='Successful login'
-            )
-            return user
-        else:
-            # Failed password - increment failed attempts
-            user.failed_login_attempts += 1
-            
-            # Lock account after 5 failed attempts for 30 minutes
-            if user.failed_login_attempts >= 5:
-                user.account_locked_until = datetime.now() + timedelta(minutes=30)
-                lock_details = f'Account locked after {user.failed_login_attempts} failed attempts'
-            else:
-                lock_details = f'Failed login attempt #{user.failed_login_attempts}'
-            
-            self.update(user)
-            
-            self.db.log_security_event(
-                user_id=user.id,
-                event_type='LOGIN_FAILED_WRONG_PASSWORD',
-                ip_address=ip_address,
-                user_agent=user_agent,
-                details=lock_details
-            )
-            return None
     
     def reset_failed_attempts(self, user_id: int) -> bool:
         """Reset failed login attempts for a user."""

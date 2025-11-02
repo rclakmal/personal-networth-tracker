@@ -297,6 +297,7 @@ function makeFieldEditable(element, fieldName, accountId, currentValue) {
     inputElement.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
+            inputElement.removeEventListener('blur', saveChanges); // Prevent duplicate save
             saveChanges();
         } else if (e.key === 'Escape') {
             e.preventDefault();

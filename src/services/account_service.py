@@ -1,25 +1,36 @@
 """Account service for business logic operations."""
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime, date
 from src.models.account import Account
 from src.repositories.account_repository import AccountRepository
+from src.repositories.account_history_repository import AccountHistoryRepository
+from src.repositories.tag_repository import TagRepository
 
 
 class AccountService:
     """Service class for Account business logic."""
     
-    def __init__(self, account_repository: AccountRepository):
-        """Initialize service with repository."""
+    def __init__(self, account_repository: AccountRepository, history_repository: AccountHistoryRepository, tag_repository: TagRepository):
+        """Initialize service with repositories."""
         self.account_repository = account_repository
+        self.history_repository = history_repository
+        self.tag_repository = tag_repository
     
     def get_user_accounts(self, user_id: int, include_archived: bool = True) -> List[Dict[str, Any]]:
-        """Get all accounts for a user."""
+        """Get all accounts for a user with tags."""
         if include_archived:
             accounts = self.account_repository.find_by_user_id(user_id)
         else:
             accounts = self.account_repository.find_active_by_user_id(user_id)
         
-        return [account.to_dict() for account in accounts]
+        # Load tags for each account
+        result = []
+        for account in accounts:
+            account_dict = account.to_dict()
+            account_dict['tags'] = self.tag_repository.find_by_account_id(account.id)
+            result.append(account_dict)
+        
+        return result
     
     def get_accounts_by_currency(self, user_id: int, currency: str) -> List[Dict[str, Any]]:
         """Get accounts for a user filtered by currency."""
@@ -27,14 +38,14 @@ class AccountService:
         return [account.to_dict() for account in accounts]
     
     def get_account_by_id(self, account_id: int) -> Optional[Dict[str, Any]]:
-        """Get account by ID."""
+        """Get account by ID with tags."""
         account = self.account_repository.find_by_id(account_id)
-        return account.to_dict() if account else None
+        if account:
+            account_dict = account.to_dict()
+            account_dict['tags'] = self.tag_repository.find_by_account_id(account.id)
+            return account_dict
+        return None
     
-    def get_account_by_asset_id(self, asset_id: str) -> Optional[Dict[str, Any]]:
-        """Get account by external asset_id."""
-        account = self.account_repository.find_by_asset_id(asset_id)
-        return account.to_dict() if account else None
     
     def create_account(self, user_id: int, account_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new account with validation and auto-generated IDs."""
@@ -66,21 +77,49 @@ class AccountService:
         try:
             created_account = self.account_repository.create(account)
             
+            # Save tags using tag repository
+            if account_data.get('tags'):
+                self._save_account_tags(created_account.id, account_data['tags'])
+            
             # Create initial history entry with current value
             history_entry = AccountHistory(
                 account_id=created_account.id,
                 date=datetime.now(),
-                value=current_value
+                value=current_value,
+                currency=account_data['currency']
             )
-            self.account_repository.add_history(history_entry)
+            self.history_repository.create(history_entry)
+            
+            # Get account dict with tags
+            result_dict = created_account.to_dict()
+            result_dict['tags'] = self.tag_repository.find_by_account_id(created_account.id)
             
             return {
                 'success': True,
-                'asset': created_account.to_dict()
+                'asset': result_dict
             }
         except Exception as e:
             return {'success': False, 'error': f'Failed to create account: {str(e)}'}
     
+    def _save_account_tags(self, account_id: int, tags: List[str]) -> None:
+        """Save tags for an account using tag repository."""
+        for tag_name in tags:
+            if not tag_name or not tag_name.strip():
+                continue
+            
+            tag_name = tag_name.strip()
+            
+            # Create tag if doesn't exist and get its ID
+            tag_id = self.tag_repository.create(tag_name)
+            if tag_id == 0:
+                # Tag already exists, fetch it
+                existing_tag = self.tag_repository.find_by_name(tag_name)
+                if existing_tag:
+                    tag_id = existing_tag['id']
+            
+            # Link tag to account
+            if tag_id:
+                self.tag_repository.link_tag_to_account(account_id, tag_id)    
     def update_account(self, account_id: int, account_data: Dict[str, Any]) -> Dict[str, Any]:
         """Update an existing account."""
         account = self.account_repository.find_by_id(account_id)
@@ -96,7 +135,7 @@ class AccountService:
         # Updatable fields (removed account_type as it's computed, and value_change_type/export_date as they're removed)
         updatable_fields = [
             'name', 'current_value', 'currency',
-            'tag', 'tags', 'archived', 'term_length', 'ownership_ratio', 'note'
+            'tag', 'archived', 'term_length', 'ownership_ratio', 'note'
         ]
         
         for field in updatable_fields:
@@ -110,11 +149,21 @@ class AccountService:
         try:
             success = self.account_repository.update(account)
             if success:
+                # Handle tags separately using tag repository
+                if 'tags' in account_data:
+                    self.tag_repository.unlink_all_tags_from_account(account_id)
+                    if account_data['tags']:
+                        self._save_account_tags(account_id, account_data['tags'])
+                
                 # If current_value was updated, handle history
                 if current_value_updated and old_value != new_value:
                     self._handle_value_history_update(account.id, new_value, account.currency)
                 
-                return {'success': True, 'asset': account.to_dict()}
+                # Get account dict with tags
+                result_dict = account.to_dict()
+                result_dict['tags'] = self.tag_repository.find_by_account_id(account.id)
+                
+                return {'success': True, 'asset': result_dict}
             else:
                 return {'success': False, 'error': 'Failed to update account'}
         except Exception as e:
@@ -140,14 +189,17 @@ class AccountService:
         
         # Special handling for tags field
         if field_name == 'tags':
-            # Update tags using repository method
-            account.tags = field_value
+            # Update tags using tag repository
             try:
-                success = self.account_repository.update(account)
-                if success:
-                    return {'success': True, 'asset': account.to_dict()}
-                else:
-                    return {'success': False, 'error': 'Failed to update tags'}
+                self.tag_repository.unlink_all_tags_from_account(account_id)
+                if field_value:
+                    self._save_account_tags(account_id, field_value)
+                
+                # Get account dict with tags
+                result_dict = account.to_dict()
+                result_dict['tags'] = self.tag_repository.find_by_account_id(account.id)
+                
+                return {'success': True, 'asset': result_dict}
             except Exception as e:
                 return {'success': False, 'error': f'Failed to update tags: {str(e)}'}
         
@@ -165,7 +217,11 @@ class AccountService:
                 if field_name == 'current_value' and old_value != field_value:
                     self._handle_value_history_update(account.id, field_value, account.currency)
                 
-                return {'success': True, 'asset': account.to_dict()}
+                # Get account dict with tags
+                result_dict = account.to_dict()
+                result_dict['tags'] = self.tag_repository.find_by_account_id(account.id)
+                
+                return {'success': True, 'asset': result_dict}
             else:
                 return {'success': False, 'error': 'Failed to update account'}
         except Exception as e:
@@ -174,12 +230,11 @@ class AccountService:
     def _handle_value_history_update(self, account_id: int, new_value: float, currency: str):
         """Handle history updates when current_value changes."""
         from src.models.account_history import AccountHistory
-        from datetime import datetime, date
         
         today = date.today()
         
         # Delete any existing history entries for today
-        self.account_repository.delete_history_for_date(account_id, today)
+        self.history_repository.delete_by_account_and_date(account_id, today)
         
         # Add new history entry for today
         history_entry = AccountHistory(
@@ -188,10 +243,16 @@ class AccountService:
             value=new_value,
             currency=currency
         )
-        self.account_repository.add_history(history_entry)
+        self.history_repository.create(history_entry)
+    
     def delete_account(self, account_id: int) -> Dict[str, Any]:
         """Delete an account."""
         try:
+            # Delete history first
+            self.history_repository.delete_by_account_id(account_id)
+            # Delete tag associations
+            self.tag_repository.unlink_all_tags_from_account(account_id)
+            # Delete account
             success = self.account_repository.delete(account_id)
             if success:
                 return {'success': True}
@@ -284,44 +345,26 @@ class AccountService:
     
     def get_account_history(self, account_id: int, start_date=None) -> list:
         """Get historical data for a specific account."""
-        from datetime import datetime, timedelta
         
-        # Get history from database
+        # Get history from history repository
         if start_date:
-            query = """
-            SELECT recorded_date as date, value 
-            FROM account_history 
-            WHERE account_id = ? AND recorded_date >= ?
-            ORDER BY recorded_date ASC
-            """
-            results = self.account_repository.db.execute_query(
-                query, (account_id, start_date.date().isoformat())
-            )
+            results = self.history_repository.find_by_account_id_after_date(account_id, start_date.date())
             
             # Get the last known value before the period start
-            pre_period_query = """
-            SELECT recorded_date as date, value 
-            FROM account_history 
-            WHERE account_id = ? AND recorded_date < ?
-            ORDER BY recorded_date DESC
-            LIMIT 1
-            """
-            pre_period_results = self.account_repository.db.execute_query(
-                pre_period_query, (account_id, start_date.date().isoformat())
-            )
+            pre_period_result = self.history_repository.find_last_before_date(account_id, start_date.date())
             
             history = []
             
             # Add pre-period value at the start date as opening balance
-            if pre_period_results:
+            if pre_period_result:
                 history.append({
                     'date': start_date.date().isoformat(),
-                    'value': pre_period_results[0]['value']
+                    'value': pre_period_result['value']
                 })
             
             # Add all the period results
             if results:
-                history.extend([{'date': row['date'], 'value': row['value']} for row in results])
+                history.extend(results)
             
             # Add current value if last entry is old
             if history:
@@ -336,14 +379,7 @@ class AccountService:
             return history
         else:
             # For "max" period, get all history
-            query = """
-            SELECT recorded_date as date, value 
-            FROM account_history 
-            WHERE account_id = ?
-            ORDER BY recorded_date ASC
-            """
-            results = self.account_repository.db.execute_query(query, (account_id,))
-            history = [{'date': row['date'], 'value': row['value']} for row in results]
+            history = self.history_repository.find_all_by_account_id(account_id)
             
             # Add current value if last entry is old
             if history:

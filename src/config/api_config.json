@@ -1,0 +1,17 @@
+{
+  "description": "API configuration for external services",
+  "exchange_rate_api": {
+    "url": "https://open.er-api.com/v6/latest/USD",
+    "timeout": 5,
+    "description": "Free exchange rate API. No API key required."
+  },
+  "crypto_price_api": {
+    "url": "https://api.coingecko.com/api/v3/simple/price",
+    "params": {
+      "ids": "bitcoin,ethereum,tether,binancecoin,cardano,solana,ripple",
+      "vs_currencies": "usd"
+    },
+    "timeout": 3,
+    "description": "CoinGecko API for cryptocurrency prices. No API key required for basic usage."
+  }
+}

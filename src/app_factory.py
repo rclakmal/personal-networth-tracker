@@ -13,8 +13,13 @@ from datetime import timedelta
 from src.utils.database import DatabaseInterface
 from src.repositories.user_repository import UserRepository
 from src.repositories.account_repository import AccountRepository
+from src.repositories.account_history_repository import AccountHistoryRepository
+from src.repositories.tag_repository import TagRepository
+from src.repositories.exchange_rate_repository import ExchangeRateRepository
 from src.services.user_service import UserService
 from src.services.account_service import AccountService
+from src.services.exchange_rate_service import ExchangeRateService
+from src.services.networth_service import NetworthService
 from src.controllers.user_controller import UserController
 from src.controllers.account_controller import AccountController
 from src.controllers.networth_controller import NetworthController
@@ -75,15 +80,20 @@ class AppFactory:
         # Initialize repositories
         user_repository = UserRepository(db_interface)
         account_repository = AccountRepository(db_interface)
+        account_history_repository = AccountHistoryRepository(db_interface)
+        tag_repository = TagRepository(db_interface)
+        exchange_rate_repository = ExchangeRateRepository(db_interface)
         
         # Initialize services
-        user_service = UserService(user_repository)
-        account_service = AccountService(account_repository)
+        user_service = UserService(user_repository, db_interface)
+        exchange_rate_service = ExchangeRateService(db_interface, exchange_rate_repository)
+        account_service = AccountService(account_repository, account_history_repository, tag_repository)
+        networth_service = NetworthService(account_repository, account_history_repository, tag_repository, exchange_rate_service)
         
         # Initialize controllers
         user_controller = UserController(user_service)
-        account_controller = AccountController(account_service)
-        networth_controller = NetworthController(db_interface, account_repository)
+        account_controller = AccountController(account_service, db_interface)
+        networth_controller = NetworthController(networth_service)
         
         # Register blueprints
         AppFactory._register_blueprints(app, user_controller, account_controller, networth_controller, limiter)

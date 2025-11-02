@@ -55,29 +55,26 @@ function initializeCurrencyAutocomplete() {
             
             // Function to filter and display currencies
             function filterCurrencies(searchTerm) {
-                const term = searchTerm.toLowerCase();
-                
-                // If empty search, show all currencies
-                let filtered;
-                if (!term || term.length === 0) {
-                    filtered = allCurrencies;
-                } else {
-                    filtered = allCurrencies.filter(currency => 
-                        currency.code.toLowerCase().includes(term) ||
-                        currency.name.toLowerCase().includes(term) ||
-                        currency.symbol.toLowerCase().includes(term)
-                    );
-                }
-                
-                if (filtered.length === 0) {
+                const search = searchTerm.toLowerCase();
+                const filtered = allCurrencies.filter(currency =>
+                    currency.code.toLowerCase().includes(search) ||
+                    currency.name.toLowerCase().includes(search) ||
+                    (currency.symbol && currency.symbol.toLowerCase().includes(search))
+                );
+                displayCurrencies(filtered);
+            }
+            
+            // Function to display currencies grouped by type
+            function displayCurrencies(currencies) {
+                if (currencies.length === 0) {
                     currencyDropdown.innerHTML = '<div class="currency-no-results" style="padding: 8px; text-align: center;">No currencies found</div>';
                     currencyDropdown.style.display = 'block';
                     return;
                 }
                 
                 // Group by type
-                const fiat = filtered.filter(c => c.type === 'fiat');
-                const crypto = filtered.filter(c => c.type === 'crypto');
+                const fiat = currencies.filter(c => c.type === 'fiat');
+                const crypto = currencies.filter(c => c.type === 'crypto');
                 
                 let html = '';
                 
