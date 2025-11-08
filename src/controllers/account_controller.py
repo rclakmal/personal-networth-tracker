@@ -182,7 +182,21 @@ class AccountController:
         if not sanitized_data.get('currency'):
             return jsonify({'error': 'Valid currency code is required'}), 400
         
-        result = self.account_service.create_account(user_id, sanitized_data)
+        # Extract and validate history data if provided
+        history_data = data.get('history', [])
+        if history_data:
+            # Validate history is a list
+            if not isinstance(history_data, list):
+                return jsonify({'error': 'History must be an array'}), 400
+            
+            # Validate each history entry
+            for i, entry in enumerate(history_data):
+                if not isinstance(entry, dict):
+                    return jsonify({'error': f'History entry {i+1} must be an object'}), 400
+                if 'date' not in entry or 'value' not in entry:
+                    return jsonify({'error': f'History entry {i+1} must have date and value fields'}), 400
+        
+        result = self.account_service.create_account(user_id, sanitized_data, history_data)
         
         if result['success']:
             return jsonify(result), 201

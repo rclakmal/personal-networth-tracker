@@ -270,7 +270,11 @@ function makeFieldEditable(element, fieldName, accountId, currentValue) {
             updateAccountField(accountId, fieldName, newValue)
                 .then(success => {
                     if (success) {
-                        loadAccounts();
+                        // Don't call loadAccounts() here - it's already called inside updateAccountField() for current_value
+                        // Only reload if it's NOT current_value field (for other fields like name, currency, etc.)
+                        if (fieldName !== 'current_value') {
+                            loadAccounts();
+                        }
                         loadAssetDetails(accountId);
                     } else {
                         element.innerHTML = originalContent;

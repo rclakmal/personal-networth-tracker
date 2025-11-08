@@ -5,6 +5,123 @@ import re
 import html
 from typing import Any, Dict, Optional
 from decimal import Decimal, InvalidOperation
+from datetime import datetime
+
+
+class DateFormatConverter:
+    """Utility class for date format conversion and normalization."""
+    
+    @staticmethod
+    def normalize_date(date_str: str) -> Optional[str]:
+        """
+        Convert various date formats to YYYY-MM-DD format.
+        
+        Args:
+            date_str: Date string in various formats
+            
+        Returns:
+            Date string in YYYY-MM-DD format or None if invalid
+        """
+        if not date_str:
+            return None
+        
+        # Remove any quotes or extra whitespace
+        date_str = date_str.replace('"', '').replace("'", '').strip()
+        
+        try:
+            # Try to parse various date formats
+            date_obj = None
+            
+            # Format: YYYY-MM-DD or YYYY/MM/DD
+            if re.match(r'^\d{4}[-/]\d{1,2}[-/]\d{1,2}$', date_str):
+                parts = re.split(r'[-/]', date_str)
+                date_obj = datetime(int(parts[0]), int(parts[1]), int(parts[2]))
+            
+            # Format: DD/MM/YYYY or DD-MM-YYYY
+            elif re.match(r'^\d{1,2}[-/]\d{1,2}[-/]\d{4}$', date_str):
+                parts = re.split(r'[-/]', date_str)
+                # Assume DD/MM/YYYY (European format)
+                date_obj = datetime(int(parts[2]), int(parts[1]), int(parts[0]))
+            
+            # Format: MM/DD/YYYY or MM-DD-YYYY (less common, but check)
+            elif re.match(r'^\d{1,2}[-/]\d{1,2}[-/]\d{4}$', date_str):
+                parts = re.split(r'[-/]', date_str)
+                # Try MM/DD/YYYY if DD/MM/YYYY failed
+                try:
+                    date_obj = datetime(int(parts[2]), int(parts[0]), int(parts[1]))
+                except ValueError:
+                    # If MM/DD/YYYY fails, stick with DD/MM/YYYY
+                    date_obj = datetime(int(parts[2]), int(parts[1]), int(parts[0]))
+            
+            # Format: YYYYMMDD
+            elif re.match(r'^\d{8}$', date_str):
+                date_obj = datetime.strptime(date_str, '%Y%m%d')
+            
+            if date_obj:
+                # Validate date is not in the future
+                if date_obj > datetime.now():
+                    return None
+                
+                # Return in YYYY-MM-DD format
+                return date_obj.strftime('%Y-%m-%d')
+                
+        except (ValueError, IndexError) as e:
+            # Invalid date
+            return None
+        
+        return None
+    
+    @staticmethod
+    def parse_date_with_format(date_str: str, date_format: str) -> Optional[str]:
+        """
+        Parse date string with specific format and convert to YYYY-MM-DD.
+        
+        Args:
+            date_str: Date string to parse
+            date_format: Expected format ('YYYY-MM-DD', 'DD/MM/YYYY', 'MM/DD/YYYY', 'DD-MM-YYYY')
+            
+        Returns:
+            Date string in YYYY-MM-DD format or None if invalid
+        """
+        if not date_str or not date_format:
+            return None
+        
+        date_str = date_str.strip()
+        
+        try:
+            date_obj = None
+            
+            if date_format == 'YYYY-MM-DD':
+                match = re.match(r'^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$', date_str)
+                if match:
+                    date_obj = datetime(int(match[1]), int(match[2]), int(match[3]))
+            
+            elif date_format == 'DD/MM/YYYY':
+                match = re.match(r'^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$', date_str)
+                if match:
+                    date_obj = datetime(int(match[3]), int(match[2]), int(match[1]))
+            
+            elif date_format == 'MM/DD/YYYY':
+                match = re.match(r'^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$', date_str)
+                if match:
+                    date_obj = datetime(int(match[3]), int(match[1]), int(match[2]))
+            
+            elif date_format == 'DD-MM-YYYY':
+                match = re.match(r'^(\d{1,2})[-](\d{1,2})[-](\d{4})$', date_str)
+                if match:
+                    date_obj = datetime(int(match[3]), int(match[2]), int(match[1]))
+            
+            if date_obj:
+                # Validate date is not in the future
+                if date_obj > datetime.now():
+                    return None
+                
+                return date_obj.strftime('%Y-%m-%d')
+                
+        except (ValueError, IndexError):
+            return None
+        
+        return None
 
 
 class InputValidator:

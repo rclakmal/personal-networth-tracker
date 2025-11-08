@@ -68,6 +68,11 @@ function initializeAddAssetModal() {
         form.reset();
         errorDiv.style.display = 'none';
         
+        // Reset history input handler
+        if (window.historyInputHandler) {
+            window.historyInputHandler.reset();
+        }
+        
         // Set default currency to current view currency after reset
         setTimeout(() => {
             if (currencySelect.value === '') {
@@ -112,6 +117,14 @@ function initializeAddAssetModal() {
             term_length: parseFloat(document.getElementById('asset-liquidity').value),
             ownership_ratio: parseFloat(document.getElementById('asset-ownership').value) / 100
         };
+        
+        // Add history data if available
+        if (window.historyInputHandler) {
+            const historyData = window.historyInputHandler.getHistoryData();
+            if (historyData && historyData.length > 0) {
+                formData.history = historyData;
+            }
+        }
         
         // Validate ownership ratio
         if (formData.ownership_ratio < 0 || formData.ownership_ratio > 1) {

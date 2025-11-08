@@ -47,9 +47,19 @@ class AccountService:
         return None
     
     
-    def create_account(self, user_id: int, account_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Create a new account with validation and auto-generated IDs."""
+    def create_account(self, user_id: int, account_data: Dict[str, Any], history_data: List[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Create a new account with validation and auto-generated IDs.
+        
+        Args:
+            user_id: The ID of the user creating the account
+            account_data: Dictionary containing account details
+            history_data: Optional list of historical values [{date, value}, ...]
+        
+        Returns:
+            Dictionary with success status and account data or error message
+        """
         from src.models.account_history import AccountHistory
+        from src.utils.validation import DateFormatConverter
         
         # Validate required fields (removed account_type as it's now computed)
         required_fields = ['name', 'currency']
@@ -81,14 +91,39 @@ class AccountService:
             if account_data.get('tags'):
                 self._save_account_tags(created_account.id, account_data['tags'])
             
-            # Create initial history entry with current value
-            history_entry = AccountHistory(
-                account_id=created_account.id,
-                date=datetime.now(),
-                value=current_value,
-                currency=account_data['currency']
-            )
-            self.history_repository.create(history_entry)
+            # Process history data if provided
+            if history_data and len(history_data) > 0:
+                # Deduplicate history by date (last entry wins)
+                date_map = {}
+                for entry in history_data:
+                    date_str = entry.get('date')
+                    value = entry.get('value')
+                    
+                    if date_str and value is not None:
+                        # Convert date to YYYY-MM-DD format (should already be done by frontend)
+                        normalized_date = DateFormatConverter.normalize_date(date_str)
+                        if normalized_date:
+                            date_map[normalized_date] = float(value)
+                
+                # Insert historical entries (oldest to newest)
+                sorted_dates = sorted(date_map.keys())
+                for date_str in sorted_dates:
+                    history_entry = AccountHistory(
+                        account_id=created_account.id,
+                        date=datetime.strptime(date_str, '%Y-%m-%d'),
+                        value=date_map[date_str],
+                        currency=account_data['currency']
+                    )
+                    self.history_repository.create(history_entry)
+            else:
+                # Create initial history entry with current value
+                history_entry = AccountHistory(
+                    account_id=created_account.id,
+                    date=datetime.now(),
+                    value=current_value,
+                    currency=account_data['currency']
+                )
+                self.history_repository.create(history_entry)
             
             # Get account dict with tags
             result_dict = created_account.to_dict()

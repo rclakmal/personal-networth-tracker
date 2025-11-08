@@ -75,6 +75,121 @@
                         <small class="form-text text-muted">What percentage do you own? (0-100)</small>
                     </div>
 
+                    <!-- Historical Values Section (Collapsible) -->
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label mb-0">
+                                <a class="text-decoration-none" data-bs-toggle="collapse" href="#historySection" role="button" aria-expanded="false" aria-controls="historySection">
+                                    <i class="bi bi-chevron-right" id="history-chevron"></i> Add Historical Values <span class="text-muted">(Optional)</span>
+                                </a>
+                            </label>
+                            <span class="badge bg-info" id="history-count-badge" style="display: none;">0 entries</span>
+                        </div>
+                        
+                        <div class="collapse" id="historySection">
+                            <div class="card card-body">
+                                <!-- Date Format Selector -->
+                                <div class="mb-3">
+                                    <label for="date-format-select" class="form-label">Date Format</label>
+                                    <select class="form-select form-select-sm" id="date-format-select">
+                                        <option value="YYYY-MM-DD" selected>YYYY-MM-DD (2024-01-15)</option>
+                                        <option value="DD/MM/YYYY">DD/MM/YYYY (15/01/2024)</option>
+                                        <option value="MM/DD/YYYY">MM/DD/YYYY (01/15/2024)</option>
+                                        <option value="DD-MM-YYYY">DD-MM-YYYY (15-01-2024)</option>
+                                    </select>
+                                    <small class="form-text text-muted">Select the format of dates you'll paste</small>
+                                </div>
+
+                                <!-- Quick Import Buttons -->
+                                <div class="btn-group mb-3" role="group">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="paste-mode-btn">
+                                        <i class="bi bi-clipboard"></i> Paste from Spreadsheet
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="csv-upload-btn">
+                                        <i class="bi bi-file-earmark-arrow-up"></i> Upload CSV
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="manual-mode-btn">
+                                        <i class="bi bi-pencil"></i> Manual Entry
+                                    </button>
+                                </div>
+
+                                <!-- Paste Mode -->
+                                <div id="paste-mode-section" style="display: none;">
+                                    <label for="history-paste-area" class="form-label">Paste Data</label>
+                                    <textarea class="form-control font-monospace" id="history-paste-area" rows="6" placeholder="Paste from Excel/Sheets:&#10;2024-01-01    8000&#10;2024-02-01    8200&#10;2024-03-01    8500&#10;&#10;Supported: Tab, Comma, or Space separated"></textarea>
+                                    <div class="d-flex justify-content-between mt-2">
+                                        <small class="form-text text-muted">Format: Date [separator] Value</small>
+                                        <button type="button" class="btn btn-sm btn-success" id="parse-paste-btn">
+                                            <i class="bi bi-check-circle"></i> Parse Data
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- CSV Upload Mode -->
+                                <div id="csv-mode-section" style="display: none;">
+                                    <label for="history-csv-file" class="form-label">Upload CSV File</label>
+                                    <input type="file" class="form-control" id="history-csv-file" accept=".csv">
+                                    <small class="form-text text-muted">Expected format: Date, Value (headers optional)</small>
+                                </div>
+
+                                <!-- Manual Entry Mode -->
+                                <div id="manual-mode-section" style="display: none;">
+                                    <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                                        <table class="table table-sm" id="history-manual-table">
+                                            <thead class="table-light sticky-top">
+                                                <tr>
+                                                    <th>Date</th>
+                                                    <th>Value</th>
+                                                    <th style="width: 50px;"></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="history-manual-tbody">
+                                                <!-- Manual rows will be added here -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="add-history-row-btn">
+                                        <i class="bi bi-plus-circle"></i> Add Row
+                                    </button>
+                                </div>
+
+                                <!-- Preview Section -->
+                                <div id="history-preview-section" style="display: none;" class="mt-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="mb-0">Preview <span id="preview-count" class="text-muted">(0 entries)</span></h6>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" id="clear-history-btn">
+                                            <i class="bi bi-trash"></i> Clear All
+                                        </button>
+                                    </div>
+                                    
+                                    <div class="alert alert-warning" id="duplicate-warning" style="display: none;">
+                                        <i class="bi bi-exclamation-triangle"></i>
+                                        <strong>Note:</strong> <span id="duplicate-count">0</span> duplicate date(s) found. Only the last value for each date will be saved.
+                                    </div>
+
+                                    <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
+                                        <table class="table table-sm table-striped" id="history-preview-table">
+                                            <thead class="table-light sticky-top">
+                                                <tr>
+                                                    <th>Date</th>
+                                                    <th>Value</th>
+                                                    <th>Status</th>
+                                                    <th style="width: 50px;"></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="history-preview-tbody">
+                                                <!-- Preview rows will be added here -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- Hidden field to store history data -->
+                                <input type="hidden" id="history-data-hidden" value="[]">
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Error Display -->
                     <div id="add-asset-error" class="alert alert-danger" style="display: none;"></div>
                 </form>

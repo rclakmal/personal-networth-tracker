@@ -640,3 +640,44 @@ button:focus,
 .tag-suggestions-dropdown::-webkit-scrollbar-thumb:hover {
     background: var(--text-muted);
 }
+
+/* Historical Values Section Styles */
+#historySection .card {
+    border: 1px dashed var(--border-color);
+    background: var(--bg-secondary);
+}
+
+#history-chevron {
+    transition: transform 0.2s ease;
+}
+
+#historySection.show #history-chevron {
+    transform: rotate(90deg);
+}
+
+.history-row-invalid {
+    background-color: rgba(220, 53, 69, 0.1) !important;
+}
+
+.history-row-duplicate {
+    background-color: rgba(255, 193, 7, 0.1) !important;
+}
+
+.history-row-valid {
+    background-color: rgba(25, 135, 84, 0.05) !important;
+}
+
+#history-preview-table .sticky-top {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--bg-primary);
+}
+
+#history-manual-table .sticky-top {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--bg-primary);
+}
+
